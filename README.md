@@ -1,4 +1,4 @@
-# SplatForge
+# RoboSplat
 
 ## Coming Soon
 
