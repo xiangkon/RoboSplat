@@ -1,0 +1,10 @@
+sapien==3.0.0b1
+numpy==1.26.1
+Pillow==8.4.0
+mplib==0.2.1
+h5py==3.13.0
+click==8.1.8
+roboticstoolbox-python==1.1.1
+e3nn==0.5.5
+einops==0.7.0
+plyfile==1.1
