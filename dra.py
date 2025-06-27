@@ -1,3 +1,10 @@
+init pose:  [0.0, 0.1, 0.0, -2.15, 0.0, 2.25, 0.78, 0.04, 0.04]
+target pose:  [Pose([0.415389, -0.189772, 0.0637301], [-0.00624987, 0.923657, -0.38292, -0.0137916]), Pose([0.415389, -0.189772, 0.0137301], [-0.00624987, 0.923657, -0.38292, -0.0137916])]
+
+init pose:  [0.0, 0.1, 0.0, -2.15, 0.0, 2.25, 0.78, 0.04, 0.04]
+target pose:  [Pose([0, 0, 0.05], [0.000138569, 0.999019, 0.0416147, -0.015141])]
+
+
 import os
 import copy
 import click
@@ -30,30 +37,12 @@ output_path = 'data/generated_demo/pick_68'
 
 object_motion = True
 # object_motion = False
-bias_Z = 0.02
-rotation_fps = 5
-motion_fps = 5
-motion_scale =  10 # 生成 0-0.02 之间的 x y 随机值
-
-pick_thro = 5e-4
-
-# 螺旋线
-# 参数设置
-spiral_theta = np.linspace(0, 3 * np.pi, 1000)  # 从0到10π，生成1000个点
-spiral_a = 0.006  # 螺距参数（控制螺旋线疏密程度）
-
-# 极坐标方程转换为直角坐标系
-spiral_r = spiral_a * spiral_theta  # 螺旋线的半径随角度线性增长
-spiral_x = spiral_r * np.cos(spiral_theta)  # x坐标
-spiral_y = spiral_r * np.sin(spiral_theta)  # y坐标
-# print(spiral_x[:20])
-dx = spiral_x[1:] - spiral_x[:-1]
-dy = spiral_y[1:] - spiral_y[:-1]
-# print(spiral_x[:20])
+bias_Z = 0.05
 
 
-
-
+angleList = [rotation_x(90), rotation_x(180), rotation_x(270),
+             rotation_y(90), rotation_y(180), rotation_y(270),
+             rotation_z(90), rotation_z(180), rotation_z(270),]
 
 def main(ref_demo_path, xy_step_str, augment_lighting, augment_appearance, augment_camera_pose, output_path, image_size, save, save_video):
     data_recorder = DataRecorder(save=save, data_path=output_path, image_shape=[image_size, image_size], save_video=save_video)
@@ -102,52 +91,29 @@ def main(ref_demo_path, xy_step_str, augment_lighting, augment_appearance, augme
 
         # generate robot behavior in new configuration
         ee_pose_list, qpos_list, action_list = [], [], []
-        object_Trot_list, object_xyz_list, object_rot_list = [], [], []
+        object_Trot_list, object_xyz_list = [], []
 
         if object_motion:
             robot_end_pose = pose_to_transformation_matrix(robot_util.get_ee_pose())
             # print(robot_end_pose)
-            robot_end_xyz = np.copy(robot_end_pose[:3, 3])
+            robot_end_xyz = robot_end_pose[:3, 3]
             robot_qpos = INIT_QPOS
             robot_end_xyz[2] = robot_end_xyz[2] - bias_Z
-            object_pose = np.copy(ee_pose_in_demo[key_frame_indices[0]])
-            object_xyz = np.copy(object_pose[:3, 3])
-            center_xy = np.copy(ee_pose_in_demo[key_frame_indices[0]][:2,3])
+            object_pose = ee_pose_in_demo[key_frame_indices[0]]
+            object_xyz = object_pose[:3, 3]
             # print(compare_arrays_diff(robot_end_xyz, object_xyz))
-            motion_index = 0
-            sum_displacement_rot_mini = 0
+            
             # 第一段 机器人靠近物体
-            while compare_arrays_diff(robot_end_xyz, object_xyz) > pick_thro:
-                motion_index += 1
+            while compare_arrays_diff(robot_end_xyz, object_xyz) > 0.01:
+                print("diff: ", compare_arrays_diff(robot_end_xyz, object_xyz))
                 key_pose_0 = np.eye(4) # 初始化物体位姿
-
                 # 随机平移
-                if motion_index % motion_fps == 0:
-                    object_xy_random = (np.random.rand(2)-0.5) / motion_scale
-                    # object_xy_random = np.array([dx[motion_index], dy[motion_index]])
-                    # spiral_x
-
-                    # 确保随机的位置都在工作空间内
-                    while compare_arrays_diff(center_xy, object_xyz[:2] + object_xy_random) > 0.06:
-                        # print("------------------------------")
-                        print("超出工作空间")
-                        object_xy_random = (np.random.rand(2)-0.5) / motion_scale # 生成 0-0.02 之间的 x y 随机值
-                    
-                else:
-                    object_xy_random = np.zeros(2)
-                print("物体 x y 平面移动距离：", compare_arrays_diff(center_xy, object_xyz[:2] + object_xy_random))
-
+                object_xy_random = np.random.rand(2) / 10000 # 生成 0-0.02 之间的 x y 随机值
+                # object_xy_random = np.array([0,0,0])
                 object_xyz[:2] = object_xyz[:2] + object_xy_random # 更新物体坐标
                 key_pose_0[:3,3] = object_xyz
                 # 随机旋转
-                
-                if motion_index % rotation_fps==0:
-                    displacement_rot_mini = np.random.uniform(0, np.pi)/90 # 获取随机浮点数
-                    # displacement_rot_mini = np.pi/360 # 获取随机浮点数
-                else:
-                    displacement_rot_mini = 0
-                sum_displacement_rot_mini += displacement_rot_mini
-                # displacement_rot_mini = 0 # 获取随机浮点数
+                displacement_rot_mini = np.random.uniform(-np.pi, np.pi) / 18 # 获取随机浮点数
                 rot_euler = (Rotation.from_euler('Z', displacement_rot_mini) * Rotation.from_matrix(object_pose[:3, :3])).as_euler('XYZ') # 意思是先按照原本的旋转变换再“进行” Z 轴方向的旋转
                 rot_euler[2] = normalize_and_adjust_angle(rot_euler[2])
                 key_pose_0[:3, :3] = Rotation.from_euler('XYZ', rot_euler).as_matrix() # 
@@ -156,35 +122,33 @@ def main(ref_demo_path, xy_step_str, augment_lighting, augment_appearance, augme
                 # 进行路径规划
                 object_pose_PoseType = Pose(key_pose_0[:3, 3] + np.array([0.0, 0.0, bias_Z]), np.array([key_pose_0_quat[3], key_pose_0_quat[0], key_pose_0_quat[1], key_pose_0_quat[2]]))
                 poses = [object_pose_PoseType]
-
+                # print("init pose: ", robot_qpos)
+                # print("target pose: ", poses)
+                # print(object_xyz)
                 trajectory = robot_util.get_trajectory(init_qpos=robot_qpos, poses=poses, gripper_action=0)
 
                 ee_pose_list_get, qpos_list_get, action_list_get, n_step_list_get = trajectory
-                if (len(ee_pose_list)==0):
-                    print("路径规划失败")
-
-                robot_end_pose = pose_to_transformation_matrix(ee_pose_list_get[2] if len(ee_pose_list_get)>3 else ee_pose_list[-1])
+                # print(type(object_xyz), type(key_pose_0_quat))
+                
+                # 机器人状态更新
+                robot_end_pose = pose_to_transformation_matrix(ee_pose_list_get[1])
                 robot_end_xyz = robot_end_pose[:3, 3]
-                robot_qpos = np.copy(qpos_list_get[2] if len(ee_pose_list_get)>3 else qpos_list[-1])
+                robot_qpos = qpos_list_get[1]
                 robot_qpos[-2:] = sum(INIT_QPOS[-2:]) / 2 # 保证 机器人夹爪在运动时不发生变化
                 # 物体状态更新
-                object_pose = np.copy(key_pose_0)
+                object_pose = key_pose_0
 
                 # 信息存储
-                ee_pose_list.append(ee_pose_list_get[2] if len(ee_pose_list_get)>3 else ee_pose_list[-1])
+                ee_pose_list.append(ee_pose_list_get[1])
                 qpos_list.append(robot_qpos)
-                action_list.append(action_list_get[2] if len(ee_pose_list_get)>3 else action_list[-1])
+                action_list.append(action_list_get[1])
 
-                T_rot = get_T_for_rotating_around_an_axis(center_xy[0], center_xy[1], sum_displacement_rot_mini)
-                print("旋转矩阵：")
-                print(T_rot)
+                T_rot = get_T_for_rotating_around_an_axis(object_pose[0, 3], object_pose[1, 3], displacement_rot_mini)
                 object_Trot_list.append(T_rot)
-                object_xyz_list.append(np.hstack((object_xy_random, np.array([0]))))
-
+                object_xyz_list.append(np.hstack(object_xy_random, np.array([0])))
 
             # 第二段 机器人末端往下运动，直到物体在夹爪中间
             poses = [Pose(key_pose_0[:3, 3], np.array([key_pose_0_quat[3], key_pose_0_quat[0], key_pose_0_quat[1], key_pose_0_quat[2]]))]
-            # print(poses)
             trajectory = robot_util.get_trajectory(init_qpos=robot_qpos, poses=poses, gripper_action=0)
             ee_pose_list.extend(trajectory[0])
             for i in range(len(trajectory[1])):
@@ -193,7 +157,6 @@ def main(ref_demo_path, xy_step_str, augment_lighting, augment_appearance, augme
                 qpos_list.append(qpos)
                 object_Trot_list.append(T_rot)
                 object_xyz_list.append(np.zeros(3))
-                # object_rot_list.append(0)
             action_list.extend(trajectory[2])
             key_ee_pose = ee_pose_list[-1]
 
@@ -208,7 +171,6 @@ def main(ref_demo_path, xy_step_str, augment_lighting, augment_appearance, augme
                 action_list.append(action)
                 object_Trot_list.append(T_rot)
                 object_xyz_list.append(np.zeros(3))
-                # object_rot_list.append(0)
 
             # 第四段 夹住物体上抬
             key_pose_1 = object_pose
@@ -226,9 +188,7 @@ def main(ref_demo_path, xy_step_str, augment_lighting, augment_appearance, augme
                 qpos_list.append(qpos)
                 object_pose[:3,3] = pose_to_transformation_matrix(trajectory[0][i])[:3,3]
                 object_Trot_list.append(T_rot)
-                object_xyz_list.append(np.array([0,0,object_pose[2,3]-object_pose_z]))
-                object_pose_z = object_pose[2,3]
-                # object_rot_list.append(0)
+                object_xyz_list.append(np.array([0,0,]))
             action_list.extend(trajectory[2])
 
         else:
@@ -248,6 +208,8 @@ def main(ref_demo_path, xy_step_str, augment_lighting, augment_appearance, augme
                 Pose(key_pose_0[:3, 3] + np.array([0.0, 0.0, bias_Z]), np.array([key_pose_0_quat[3], key_pose_0_quat[0], key_pose_0_quat[1], key_pose_0_quat[2]])),
                 Pose(key_pose_0[:3, 3], np.array([key_pose_0_quat[3], key_pose_0_quat[0], key_pose_0_quat[1], key_pose_0_quat[2]]))
             ]
+            # print("init pose: ", INIT_QPOS)
+            # print("target pose: ", poses)
             
             trajectory = robot_util.get_trajectory(init_qpos=INIT_QPOS, poses=poses, gripper_action=0)
             # print(trajectory)
@@ -274,7 +236,9 @@ def main(ref_demo_path, xy_step_str, augment_lighting, augment_appearance, augme
             rot_euler = (Rotation.from_euler('Z', displacement_rot) * Rotation.from_matrix(ee_pose_in_demo[key_frame_indices[1]][:3, :3])).as_euler('XYZ')
             rot_euler[2] = normalize_and_adjust_angle(rot_euler[2])
             key_pose_1[:3, :3] = Rotation.from_euler('XYZ', rot_euler).as_matrix()
-
+            # poses = [
+            #     Pose(key_pose_1[:3, 3], Rotation.from_matrix(key_pose_1[:3, :3]).as_quat(scalar_first=True)),
+            # ]
             key_pose_1_quat = Rotation.from_matrix(key_pose_1[:3, :3]).as_quat()
             poses = [
                 Pose(key_pose_1[:3, 3], np.array([key_pose_1_quat[3], key_pose_1_quat[0], key_pose_1_quat[1], key_pose_1_quat[2]])),
@@ -292,21 +256,17 @@ def main(ref_demo_path, xy_step_str, augment_lighting, augment_appearance, augme
         # mango_gaussian_aug = copy.deepcopy(mango_gaussian)
 
         episode_length = len(qpos_list)
-        print("数据长度：", episode_length)
         image_0_list = []
         image_1_list = []
         image_2_list = []
-        xyz_bias = np.zeros(3)
         for i in range(episode_length):
 
             if object_motion:
                 object_gaussian_aug = copy.deepcopy(object_gaussian_origin)
                 # print(object_pose)
 
-                object_gaussian = transform_gaussian(object_gaussian_aug, torch.from_numpy(object_Trot_list[i]).cuda().to(torch.float32))
-                xyz_bias = xyz_bias + object_xyz_list[i]
-                object_gaussian._xyz = object_gaussian._xyz + torch.from_numpy(xyz_bias).cuda()
-
+                object_gaussian = transform_gaussian(object_gaussian_origin, torch.from_numpy(object_pose_list[i]).cuda().to(torch.float32))
+                
             else:
                 object_gaussian_aug = copy.deepcopy(object_gaussian_origin)
                 T_rot = get_T_for_rotating_around_an_axis(ee_pose_in_demo[key_frame_indices[0]][0, 3], ee_pose_in_demo[key_frame_indices[0]][1, 3], displacement_rot)
@@ -336,7 +296,7 @@ def main(ref_demo_path, xy_step_str, augment_lighting, augment_appearance, augme
             # Trans = pose_to_transformation_matrix(ee_pose_list[i]) @ rotation_z(180)
             Trans = pose_to_transformation_matrix(ee_pose_list[i]) @ rotation_z(90)
 
-            Trans[2,3] = Trans[2,3] + 0.23
+            Trans[2,3] = Trans[2,3] + 0.05
             camera_2, renderer_2= get_changed_camera_and_renderer(Trans)
             # mango_gaussian_aug._xyz = mango_gaussian._xyz*0.01 + torch.from_numpy(Trans[:3,3]).cuda()
             
@@ -365,18 +325,18 @@ def main(ref_demo_path, xy_step_str, augment_lighting, augment_appearance, augme
             rgb_0 = renderer_0.render(gaussian_all)
             rgb_0 = (np.clip(rgb_0.detach().cpu().numpy(), 0.0, 1.0) * 255).astype(np.uint8)
             image_0_list.append(rgb_0)
-            rgb_0 = np.array(Image.fromarray(rgb_0).resize([image_size, image_size], Image.LANCZOS))
+            rgb_0 = np.array(Image.fromarray(rgb_0).resize([image_size, image_size], Image.ANTIALIAS))
 
             rgb_1 = renderer_1.render(gaussian_all)
             rgb_1 = (np.clip(rgb_1.detach().cpu().numpy(), 0.0, 1.0) * 255).astype(np.uint8)
             image_1_list.append(rgb_1)
-            rgb_1 = np.array(Image.fromarray(rgb_1).resize([image_size, image_size], Image.LANCZOS))
+            rgb_1 = np.array(Image.fromarray(rgb_1).resize([image_size, image_size], Image.ANTIALIAS))
 
             rgb_2 = renderer_2.render(gaussian_all)
             rgb_2 = (np.clip(rgb_2.detach().cpu().numpy(), 0.0, 1.0) * 255).astype(np.uint8)
             image_2_list.append(rgb_2)
-            rgb_2 = np.array(Image.fromarray(rgb_2).resize([image_size, image_size], Image.LANCZOS))
-# 
+            rgb_2 = np.array(Image.fromarray(rgb_2).resize([image_size, image_size], Image.ANTIALIAS))
+
             data_recorder.append_step_in_current_episode({
                 'qpos': qpos_list[i], 
                 'ee_pose': ee_pose_list[i], 
@@ -392,7 +352,6 @@ def main(ref_demo_path, xy_step_str, augment_lighting, augment_appearance, augme
             save_rgb_images_to_video(image_0_list, f'{output_path}/demo_{demo_idx}_0.mp4')
             save_rgb_images_to_video(image_1_list, f'{output_path}/demo_{demo_idx}_1.mp4')
             save_rgb_images_to_video(image_2_list, f'{output_path}/demo_{demo_idx}_2.mp4')
-            print("save videos successfully!!!")
 
 
 if __name__ == '__main__':

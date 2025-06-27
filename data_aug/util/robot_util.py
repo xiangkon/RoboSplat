@@ -8,7 +8,8 @@ import roboticstoolbox as rtb
 from roboticstoolbox.robot.ERobot import ERobot
 
 
-INIT_QPOS = [0.0, 0.1, 0.0, -2.15, 0.0, 2.25, 0.78, 0.04, 0.04]
+# INIT_QPOS = [0.0, 0.1, 0.0, -2.15, 0.0, 2.25, 0.78, 0.04, 0.04]
+INIT_QPOS = [0.0, -0.6, 0.0, -2.3, 0.0, 1.9, 0.78, 0.04, 0.04]
 
 class FrankaEmikaPanda(ERobot):
     '''
@@ -314,6 +315,7 @@ class RobotUtil:
                 self.get_qpos(),
                 time_step=1/self.control_hz if control_hz is None else 1/control_hz[pose_idx],
             )
+            # print(result)
             result_pos = result['position']
             # combine the small action
             # delta_action = abs(result_pos[1:] - result_pos[:-1])

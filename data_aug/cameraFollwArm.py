@@ -16,7 +16,7 @@ from data_aug.util.gaussian_util import GaussianModel, GaussianRenderer, Camera,
 from data_aug.util.camera_util import cam_and_lookat_pos_to_camera_R_and_T
 from data_aug.util.data_record_util import DataRecorder
 from data_aug.util.augment_util import *
-
+from data_aug.util.self_util import *
 
 
 image_size = 256
@@ -24,82 +24,11 @@ save = True
 save_video = True
 ref_demo_path = 'data/source_demo/real_000000.h5'
 xy_step_str = '[10, 10]'
-augment_lighting = True
+augment_lighting = False
 augment_appearance = False
 augment_camera_pose = False
 output_path = 'data/generated_demo/pick_68'
 
-def pose_to_transformation_matrix(pose):
-    # 构造变换矩阵
-    transformation_matrix = np.eye(4)  # 初始化为 4x4 单位矩阵
-
-    # 设置平移部分
-    transformation_matrix[0:3, 3] = [pose[0], pose[1], pose[2]]
-
-    # 四元数转旋转矩阵部分
-    # 假设四元数是 w, x, y, z 的形式
-    q_w = pose[3]
-    q_x = pose[4]
-    q_y = pose[5]
-    q_z = pose[6]
-
-    # 根据四元数构造旋转矩阵
-    rotation_matrix = np.array([
-        [1 - 2*q_y**2 - 2*q_z**2, 2*q_x*q_y - 2*q_z*q_w, 2*q_x*q_z + 2*q_y*q_w],
-        [2*q_x*q_y + 2*q_z*q_w, 1 - 2*q_x**2 - 2*q_z**2, 2*q_y*q_z - 2*q_x*q_w],
-        [2*q_x*q_z - 2*q_y*q_w, 2*q_y*q_z + 2*q_x*q_w, 1 - 2*q_x**2 - 2*q_y**2]
-    ])
-
-    # 将旋转矩阵放到变换矩阵的左上角
-    transformation_matrix[0:3, 0:3] = rotation_matrix
-
-    return transformation_matrix
-
-Tz = np.array([[0,-1,0,0],
-                [1, 0,0,0],
-                [0, 0,1,0],
-                [0, 0,0,1]], dtype=float)
-
-Tx = np.array([[1, 0, 0, 0],
-                [0, 0, -1, 0],
-                [0, 1, 0, 0],
-                [0, 0, 0, 1]], dtype=float)
-Ty = np.array([[0, 0, 1, 0],
-                [0, 1, 0, 0],
-                [-1, 0, 0, 0],
-                [0, 0, 0, 1]], dtype=float)
-
-# 绕x轴旋转180度的变换矩阵
-def rotation_x(angel):
-    theta = np.radians(angel)  # 转换为弧度
-    rotation_x = np.array([
-        [1, 0, 0, 0],
-        [0, np.cos(theta), -np.sin(theta), 0],
-        [0, np.sin(theta), np.cos(theta), 0],
-        [0, 0, 0, 1]
-    ])
-    return rotation_x
-# 绕y轴旋转180度的变换矩阵
-def rotation_y(angel):
-    theta = np.radians(angel)  # 转换为弧度
-    rotation_y = np.array([
-        [np.cos(theta), 0, np.sin(theta), 0],
-        [0, 1, 0, 0],
-        [-np.sin(theta), 0, np.cos(theta), 0],
-        [0, 0, 0, 1]
-    ])
-    return rotation_y
-
-# 绕z轴旋转180度的变换矩阵
-def rotation_z(angel):
-    theta = np.radians(angel)  # 转换为弧度
-    rotation_z = np.array([
-        [np.cos(theta), -np.sin(theta), 0, 0],
-        [np.sin(theta), np.cos(theta), 0, 0],
-        [0, 0, 1, 0],
-        [0, 0, 0, 1]
-    ])
-    return rotation_z
 
 angleList = [rotation_x(90), rotation_x(180), rotation_x(270),
              rotation_y(90), rotation_y(180), rotation_y(270),
@@ -124,6 +53,7 @@ def main(ref_demo_path, xy_step_str, augment_lighting, augment_appearance, augme
     grasp_width = qpos_in_demo[:, -1].min()
 
     robot_util = RobotUtil()
+    # print('robot_pose:', robot_util.get_ee_pose())
 
     if not augment_camera_pose:
         camera_0, renderer_0, camera_1, renderer_1 = get_camera_and_renderer()
@@ -165,11 +95,12 @@ def main(ref_demo_path, xy_step_str, augment_lighting, augment_appearance, augme
         key_pose_0_quat = Rotation.from_matrix(key_pose_0[:3, :3]).as_quat()
 
         poses = [
-            Pose(key_pose_0[:3, 3] + np.array([0.0, 0.0, 0.12]), np.array([key_pose_0_quat[3], key_pose_0_quat[0], key_pose_0_quat[1], key_pose_0_quat[2]])),
+            Pose(key_pose_0[:3, 3] + np.array([0.0, 0.0, 0.05]), np.array([key_pose_0_quat[3], key_pose_0_quat[0], key_pose_0_quat[1], key_pose_0_quat[2]])),
             Pose(key_pose_0[:3, 3], np.array([key_pose_0_quat[3], key_pose_0_quat[0], key_pose_0_quat[1], key_pose_0_quat[2]]))
         ]
         
         trajectory = robot_util.get_trajectory(init_qpos=INIT_QPOS, poses=poses, gripper_action=0)
+        ee_pose_list, qpos_list, action_list, n_step_list = trajectory
         # print(trajectory)
         ee_pose_list.extend(trajectory[0])
         for i in range(len(trajectory[1])):
@@ -221,6 +152,9 @@ def main(ref_demo_path, xy_step_str, augment_lighting, augment_appearance, augme
         actual_displacement_pos[2] = 0.0  # z should not be modified
         object_gaussian_aug._xyz = object_gaussian_aug._xyz + torch.from_numpy(actual_displacement_pos).cuda()
 
+        print("key_pose: ", key_pose_0)
+        print("T_rot: ", T_rot)
+
         # mango_gaussian_aug = copy.deepcopy(mango_gaussian)
 
         episode_length = len(qpos_list)
@@ -228,6 +162,7 @@ def main(ref_demo_path, xy_step_str, augment_lighting, augment_appearance, augme
         image_1_list = []
         image_2_list = []
         for i in range(episode_length):
+
             # object gaussian
             if i > 0 and action_list[i-1][-1] == 0 and action_list[i][-1] == 1:
                 ref_ee_pose = ee_pose_list[i]
@@ -252,9 +187,6 @@ def main(ref_demo_path, xy_step_str, augment_lighting, augment_appearance, augme
             camera_2, renderer_2= get_changed_camera_and_renderer(Trans)
             # mango_gaussian_aug._xyz = mango_gaussian._xyz*0.01 + torch.from_numpy(Trans[:3,3]).cuda()
             
-
-
-
             if augment_appearance:
                 gaussian_plane_table, gaussian_plane_front, gaussian_plane_left, gaussian_plane_right = get_gaussian_plane(texture=True)
                 gaussian_all.compose([robot_gaussian, object_gaussian, gaussian_plane_table, gaussian_plane_front, gaussian_plane_left, gaussian_plane_right])

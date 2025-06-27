@@ -140,7 +140,7 @@ def get_changed_camera_and_renderer(c2w):
     # R_0, T_0 = get_R_T_fromw2c(c2w)
 
     # camera = RealCamera(R=R_0, T=T_0, c2w=None, fovy=0.7515759938811762, fovx=0.9684658025776031, znear=0.1, zfar=10.0, image_size=[480, 640])
-    camera = RealCamera(R=None, T=None, c2w=c2w, fovy=0.7515759938811762, fovx=0.9684658025776031, znear=0.1, zfar=10.0, image_size=[960, 1280])
+    camera = RealCamera(R=None, T=None, c2w=c2w, fovy=0.7515759938811762, fovx=0.9684658025776031, znear=0.1, zfar=10.0, image_size=[480, 640])
     renderer = GaussianRenderer(camera, bg_color=[0.0, 0.0, 0.0])
 
     return camera, renderer
