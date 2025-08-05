@@ -97,6 +97,17 @@ def get_camera_and_renderer():
 
     return camera_0, renderer_0, camera_1, renderer_1
 
+
+def get_camera_and_renderer_2():
+    c2w = np.loadtxt('data/camera_pose/front_cam_pose_2.txt')
+    c2w_1 = np.loadtxt('data/camera_pose/side_cam_pose_2.txt')
+
+    camera_0 = RealCamera(R=None, T=None, c2w=c2w, fovy=0.7515759938811762, fovx=0.9684658025776031, znear=0.1, zfar=10.0, image_size=[480, 640])
+    renderer_0 = GaussianRenderer(camera_0, bg_color=[0.0, 0.0, 0.0])
+    camera_1 = RealCamera(R=None, T=None, c2w=c2w_1, fovy=0.7552235860675748, fovx=0.9709616850130633, znear=0.1, zfar=10.0, image_size=[480, 640])
+    renderer_1 = GaussianRenderer(camera_1, bg_color=[0.0, 0.0, 0.0])
+
+    return camera_0, renderer_0, camera_1, renderer_1
 def get_camera_param():
     c2w = np.loadtxt('data/camera_pose/front_cam_pose.txt')
     c2w_1 = np.loadtxt('data/camera_pose/side_cam_pose.txt')

@@ -26,7 +26,7 @@ xy_step_str = '[10, 10]'
 augment_lighting = False
 augment_appearance = False
 augment_camera_pose = False
-output_path = 'data/generated_demo/pick_68'
+output_path = 'data/generated_demo/pick_69'
 
 object_motion = True
 # object_motion = False
@@ -70,7 +70,7 @@ def main(ref_demo_path, xy_step_str, augment_lighting, augment_appearance, augme
         if action_in_demo[i - 1][-1] != action_in_demo[i][-1]:
             key_frame_indices.append(i)
     key_frame_indices.append(origin_episode_length - 1)
-    num_grasp_step = 3  # The number of steps required to close the gripper. It is usually 3 to 6.
+    num_grasp_step = 60  # The number of steps required to close the gripper. It is usually 3 to 6.
     grasp_width = qpos_in_demo[:, -1].min()
 
     robot_util = RobotUtil()

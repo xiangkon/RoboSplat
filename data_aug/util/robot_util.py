@@ -71,6 +71,7 @@ class RobotUtil:
         self.init_qpos = INIT_QPOS
         self.robot.set_qpos(self.init_qpos)
         self.end_effector = self.robot.get_links()[10]
+        print(self.robot.get_links())
         for link in self.robot.links:
             link.disable_gravity = True
 
